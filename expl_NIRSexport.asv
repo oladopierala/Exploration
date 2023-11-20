@@ -1,0 +1,102 @@
+% expl_NIRSexport.m - script to export preprocessed fNIRS data from
+% Exploration pilot for statistical analyses
+%
+% created by Dr. Ola Dopierala, UBC, June 2023
+%
+%
+% Input: - list of preprocessed .nirs files
+%
+%
+% Output: - excel file with exported mean results
+%
+% ------------------------------------------------------------------------
+
+% Load data
+importFolder = '/Users/andrzejdopierala/Desktop/Exploration/_PilotApril22/1.Pilot_Data_NIRS/ALL_NIRS_FILES/SCI_Coded/EXPLPilot_Paper/Preproc/pp1_06-2023/';
+filelist = dir([importFolder '*.nirs']);
+
+prepFile = dir(fullfile(importFolder,'Preproc_Info*.mat'));
+load([prepFile.folder filesep prepFile.name],'-mat');
+clear prepFile
+
+%Parameters to control the mean extraction
+baselineEnd = 2; %2 seconds
+expWindowStart = baselineEnd+5; %experiemntal time window (5)
+expWindowEnd = baselineEnd+15; %experiemntal time window (15)
+
+% Desing
+des = 'block';
+
+% Switch values depending on design (event- or block)
+switch des
+    case 'block'
+        % Identify columns in the s matrix to pull from
+        con1 = find(strcmp(Conds, 'CIDS_Block'));
+        con2 = find(strcmp(Conds, 'IL_Block'));
+        
+    case 'event'
+        % Identify columns in the s matrix to pull from
+        con1 = find(strcmp(Conds, 'CIDS_Event'));
+        con2 = find(strcmp(Conds, 'IL_Event'));
+end
+
+% Results file name
+fileName = ['/Users/andrzejdopierala/Desktop/EXPL_Pilot_Mean_' num2str(expWindowStart-baselineEnd) '_' num2str(expWindowEnd-baselineEnd) 's.xlsx'];
+
+% Extract data into a table
+
+iRow=1; %indexing row numbers to save data
+
+for iSub = 1:numel(filelist)
+    
+    %load fNIRS data
+    nirs_data = load([filelist(iSub).folder filesep filelist(iSub).name],'-mat');
+    
+    for iCh = 1:numel(Ch)
+        
+        % check if that channel is included
+        if ChannelsM{iSub,iCh+1} == 1
+            
+            for chrom = 1:2
+                for cond = [con1, con2]
+                    for time = 1:2
+                        
+                        % save what values we're calculating
+                        dataTable(iRow,1)=iSub;
+                        dataTable(iRow,2)=iCh;
+                        dataTable(iRow,3)=chrom;
+                        dataTable(iRow,4)=cond;
+                        dataTable(iRow,5)=time;
+                        
+                        if time == 1 
+                            
+                            [meanValue] = mean(nirs_data.procResult.dcAvg...
+                                (1:baselineEnd*fs,chrom,iCh,cond));%Baseline
+                            dataTable(iRow,6)=meanValue* 1000000;
+                            
+                        else 
+                            [meanValue] = mean(nirs_data.procResult.dcAvg...
+                                (expWindowStart*fs:expWindowEnd*fs,chrom,iCh,cond));%Activation window
+                            dataTable(iRow,7)=meanValue* 1000000;
+                            
+                        end
+                    end
+                end
+            end
+            
+            
+        else % if the channel was excluded, save as missing values
+            %save the calcualted data
+            dataTable(iRow,6)=NaN;
+            
+            
+        end
+        
+        iRow = iRow+1;
+        
+    end
+end
+
+
+
+
